@@ -13,7 +13,7 @@ except ImportError: # Django < 1.5
 
 
 class InheritanceQuerySet(QuerySet):
-    def select_subclasses(self, *subclasses):
+    def select_subclasses(self, *subclasses, **kwargs):
         if not subclasses:
             # only recurse one level on Django < 1.6 to avoid triggering
             # https://code.djangoproject.com/ticket/16572
@@ -23,7 +23,8 @@ class InheritanceQuerySet(QuerySet):
             subclasses = self._get_subclasses_recurse(self.model, levels=levels)
         # workaround https://code.djangoproject.com/ticket/16855
         field_dict = self.query.select_related
-        new_qs = self.select_related(*subclasses)
+        related_args = subclasses if not kwargs.get('select_related') else (tuple(subclasses) + tuple(kwargs.get('select_related')))
+        new_qs = self.select_related(*related_args)
         if isinstance(new_qs.query.select_related, dict) and isinstance(field_dict, dict):
             new_qs.query.select_related.update(field_dict)
         new_qs.subclasses = subclasses
@@ -101,8 +102,8 @@ class InheritanceManager(models.Manager):
     def get_query_set(self):
         return InheritanceQuerySet(self.model)
 
-    def select_subclasses(self, *subclasses):
-        return self.get_query_set().select_subclasses(*subclasses)
+    def select_subclasses(self, *subclasses, **kwargs):
+        return self.get_query_set().select_subclasses(*subclasses, **kwargs)
 
     def get_subclass(self, *args, **kwargs):
         return self.get_query_set().select_subclasses().get(*args, **kwargs)
